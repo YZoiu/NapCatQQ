@@ -16,6 +16,8 @@ const OFFICIAL_PLUGIN_IDS = new Set<string>([
   'napcat-plugin-cleaner',
   'napcat-plugin-ssqq',
   'napcat-plugin-qce',
+  // XHB's adapter is built and installed from the pinned XHB workspace.
+  'xhb-runtime',
 ]);
 
 /**
