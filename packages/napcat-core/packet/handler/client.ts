@@ -30,6 +30,8 @@ export class NativePacketHandler {
   private readonly MoeHooExport: { exports: NativePacketExportType; } = { exports: {} };
   protected readonly logger: LogWrapper;
   private loaded: boolean = false;
+  /** Empty after initHook accepts the receive callback. A non-empty value means the instance must not go online. */
+  receiveInitError = '';
 
   // 统一的监听器存储 - key: 'all' | 'type:0' | 'type:1' | 'cmd:xxx' | 'exact:type:cmd'
   private readonly listeners: Map<string, Set<ListenerEntry>> = new Map();
@@ -198,27 +200,43 @@ export class NativePacketHandler {
     const version_arch = version + '-' + process.arch;
     try {
       if (!this.loaded) {
-        this.logger.logWarn('NativePacketClient 未成功加载，无法初始化');
+        this.receiveInitError = 'NativePacketClient 未成功加载，无法初始化';
+        this.logger.logWarn(this.receiveInitError);
         return false;
       }
       const send = typedOffset[version_arch]?.send;
       const recv = typedOffset[version_arch]?.recv;
       if (!send || !recv) {
-        this.logger.logWarn(`NativePacketClient: 未找到对应版本的偏移数据: ${version_arch}`);
+        this.receiveInitError = `NativePacketClient: 未找到对应版本的偏移数据: ${version_arch}`;
+        this.logger.logWarn(this.receiveInitError);
         return false;
       }
       const platform = process.platform + '.' + process.arch;
       if (!this.supportedPlatforms.includes(platform)) {
-        this.logger.logWarn(`NativePacketClient: 不支持的平台: ${platform}`);
+        this.receiveInitError = `NativePacketClient: 不支持的平台: ${platform}`;
+        this.logger.logWarn(this.receiveInitError);
         return false;
       }
 
-      this.MoeHooExport.exports.initHook?.(send, recv, (type: PacketType, uin: string, cmd: string, seq: number, hex_data: string) => {
+      const initHook = this.MoeHooExport.exports.initHook;
+      if (typeof initHook !== 'function') {
+        this.receiveInitError = 'NativePacketClient initHook is unavailable';
+        this.logger.logWarn('[PacketHandler] initHook 不可用，收包钩子未初始化');
+        return false;
+      }
+      const accepted = initHook(send, recv, (type: PacketType, uin: string, cmd: string, seq: number, hex_data: string) => {
         this.emitPacket(type, uin, cmd, seq, hex_data);
       }, o3HookMode);
+      if (accepted !== true) {
+        this.receiveInitError = 'NativePacketClient initHook rejected the receive hook';
+        this.logger.logWarn('[PacketHandler] initHook 返回失败，收包钩子未初始化');
+        return false;
+      }
+      this.receiveInitError = '';
       this.logger.log('[PacketHandler] 初始化成功');
       return true;
     } catch (error) {
+      this.receiveInitError = error instanceof Error ? error.message : String(error);
       this.logger.logError('NativePacketClient 初始化出错:', error);
       return false;
     }

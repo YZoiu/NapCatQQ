@@ -46,7 +46,7 @@ export class NativePacketClient {
     const success = this.napi2nativeLoader.initHook(send, recv);
     if (success) {
       this.available = true;
-      this.logStack.pushLogInfo(`[PacketClient] NativePacketClient Hook 初始化成功 platform=${process.platform}.${process.arch}`);
+      this.logStack.pushLogInfo(`[PacketClient] send hook initialized platform=${process.platform}.${process.arch}`);
       return;
     }
     this.logStack.pushLogError(`[PacketClient] NativePacketClient Hook 初始化失败 platform=${process.platform}.${process.arch} send=${send} recv=${recv}`);
