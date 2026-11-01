@@ -14,7 +14,8 @@ interface OffsetType {
 const typedOffset: OffsetType = offset;
 // 0 send 1 recv
 export interface NativePacketExportType {
-  initHook?: (send: string, recv: string, callback: (type: PacketType, uin: string, cmd: string, seq: number, hex_data: string) => void, o3_hook: boolean) => boolean;
+  /** MoeHoo reports its outcome as a status string ("success" or "error ..."), not a boolean. */
+  initHook?: (send: string, recv: string, callback: (type: PacketType, uin: string, cmd: string, seq: number, hex_data: string) => void, o3_hook: boolean) => boolean | string;
 }
 
 export type PacketType = 0 | 1; // 0: send, 1: recv
@@ -227,9 +228,17 @@ export class NativePacketHandler {
       const accepted = initHook(send, recv, (type: PacketType, uin: string, cmd: string, seq: number, hex_data: string) => {
         this.emitPacket(type, uin, cmd, seq, hex_data);
       }, o3HookMode);
-      if (accepted !== true) {
-        this.receiveInitError = 'NativePacketClient initHook rejected the receive hook';
-        this.logger.logWarn('[PacketHandler] initHook 返回失败，收包钩子未初始化');
+      // MoeHoo returns a status string ("success" on the working path, "error ..."
+      // otherwise) rather than a boolean. Requiring `=== true` rejects a hook that
+      // is installed and already delivering packets, which leaves the receive path
+      // permanently disabled. Accept the native success status, and keep the native
+      // reason when it reports a failure.
+      const acceptedStatus = typeof accepted === 'string' ? accepted.trim() : '';
+      if (accepted !== true && acceptedStatus !== 'success') {
+        this.receiveInitError = acceptedStatus
+          ? `NativePacketClient initHook failed: ${acceptedStatus}`
+          : 'NativePacketClient initHook rejected the receive hook';
+        this.logger.logWarn(`[PacketHandler] initHook 返回失败，收包钩子未初始化: ${this.receiveInitError}`);
         return false;
       }
       this.receiveInitError = '';
