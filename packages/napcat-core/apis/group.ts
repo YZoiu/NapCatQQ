@@ -92,9 +92,7 @@ export class NTQQGroupApi {
   }
 
   async initCache () {
-    for (const group of await this.getGroups(true)) {
-      this.refreshGroupMemberCache(group.groupCode, false).then().catch(e => this.context.logger.logError(e));
-    }
+    // XHB: never prefetch all group member lists (OIDB 0xFE7_3). Members load on demand.
   }
 
   async fetchGroupEssenceList (groupCode: string) {
